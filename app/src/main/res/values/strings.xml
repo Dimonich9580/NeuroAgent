@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NeuroAgent</string>
+    <string name="a11y_service_label">NeuroAgent: управление экраном</string>
+    <string name="a11y_service_description">Позволяет агенту читать дерево интерфейса и выполнять жесты и ввод текста. Работает только когда вы включили эту возможность в NeuroAgent.</string>
+</resources>

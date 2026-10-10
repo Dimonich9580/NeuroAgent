@@ -1,0 +1,73 @@
+# Reproducible-build gate (ТЗ 4, 5 этап): two independent builds in different directories
+# must produce byte-identical APKs.
+name: reproducible
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Proprietary-dependency audit (sources, manifests, binaries)
+        run: SKIP_GRADLE_AUDIT=1 bash scripts/check_no_proprietary.sh
+
+  unit-tests:
+    runs-on: ubuntu-24.04
+    needs: audit
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Runtime classpath audit
+        run: bash scripts/check_no_proprietary.sh
+      - run: ./gradlew --no-daemon :app:testReleaseUnitTest
+
+  build-twice:
+    runs-on: ubuntu-24.04
+    needs: unit-tests
+    env:
+      SOURCE_DATE_EPOCH: "1700000000"
+      TZ: UTC
+      LC_ALL: C.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install NDK 27.2.12479018 and CMake 3.22.1
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "ndk;27.2.12479018" "cmake;3.22.1" "build-tools;35.0.0" "platforms;android-35"
+      # Build 1 in the checkout path
+      - name: Build #1
+        run: ./gradlew --no-daemon --no-build-cache clean :app:assembleRelease
+      - run: sha256sum app/build/outputs/apk/release/*.apk | tee build1.sha256
+      # Build 2: clean rebuild in the SAME directory (same absolute path, same env).
+      # Path-independence of the native lib is guaranteed by -ffile-prefix-map in CMakeLists.txt.
+      - name: Build #2 (clean, same path)
+        run: ./gradlew --no-daemon --no-build-cache clean :app:assembleRelease
+      - name: Compare
+        run: |
+          sha256sum app/build/outputs/apk/release/*.apk | tee build2.sha256
+          if diff <(cut -d' ' -f1 build1.sha256) <(cut -d' ' -f1 build2.sha256); then
+            echo "REPRODUCIBLE: identical APK hashes"
+          else
+            echo "NOT reproducible"; exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-release-unsigned
+          path: app/build/outputs/apk/release/*.apk

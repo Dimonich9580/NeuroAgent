@@ -1,0 +1,38 @@
+# F-Droid build metadata (draft for submission to fdroiddata)
+Categories:
+  - System
+  - Development
+License: GPL-3.0-only
+AuthorName: NeuroAgent contributors
+SourceCode: https://github.com/Dimonich9580/NeuroAgent
+IssueTracker: https://github.com/Dimonich9580/NeuroAgent/issues
+Changelog: https://github.com/Dimonich9580/NeuroAgent/releases
+AutoName: NeuroAgent
+Summary: On-device and cloud AI agent that controls the phone
+Description: |
+    NeuroAgent is an autonomous AI agent for Android. It sends your request to an
+    OpenAI-compatible API (or a local GGUF model via llama.cpp) and lets the model use
+    tools: read the screen (AccessibilityService), tap and type, run shell commands,
+    and run privileged commands through Shizuku. Every capability is off by default and
+    can be enabled in Settings.
+
+    Dependencies are FOSS only. No Google Mobile Services, no analytics.
+
+RepoType: git
+Repo: https://github.com/Dimonich9580/NeuroAgent.git
+
+Builds:
+  - versionName: 0.1.0
+    versionCode: 1
+    commit: v0.1.0
+    subdir: app
+    gradle:
+      - yes
+    ndk: 27.2.12479018
+    prebuild: sh ../scripts/fetch_llama.sh
+    output: build/outputs/apk/release/app-release-unsigned.apk
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 0.1.0
+CurrentVersionCode: 1
