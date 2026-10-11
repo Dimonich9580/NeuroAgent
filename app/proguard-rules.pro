@@ -12,4 +12,4 @@
 }
 # generate() callback is invoked from native code via Function1.invoke
 -keep class kotlin.jvm.functions.Function1 { *; }
-   -dontwarn com.google.errorprone.annotations.**
+ -dontwarn com.google.errorprone.annotations.**
