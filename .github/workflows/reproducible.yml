@@ -13,6 +13,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Fix gradlew permissions
+        run: chmod +x gradlew
       - name: Proprietary-dependency audit (sources, manifests, binaries)
         run: SKIP_GRADLE_AUDIT=1 bash scripts/check_no_proprietary.sh
 
@@ -23,6 +25,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Fix gradlew permissions
+        run: chmod +x gradlew
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -43,6 +47,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Fix gradlew permissions
+        run: chmod +x gradlew
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
