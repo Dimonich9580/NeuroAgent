@@ -30,8 +30,8 @@ jobs:
     name: py_compile + smoke
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Install deps
@@ -52,7 +52,7 @@ jobs:
     name: bash -n + yaml
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: bash -n
         run: |
           bash -n cluster-checks.sh
@@ -79,7 +79,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: python
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build worker image
         run: |
           docker build -f cluster/Dockerfile.worker \
