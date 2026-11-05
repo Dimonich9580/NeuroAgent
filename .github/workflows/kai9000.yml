@@ -2,7 +2,9 @@ name: kai9000
 
 on:
   push:
-    branches: [kai9000]
+    # main включён: после merge kai9000 -> main код живёт в main без PR,
+    # и без этого триггера main остаётся без CI.
+    branches: [main, kai9000]
     paths:
       - 'kai9000/**'
       - 'cluster/**'
@@ -24,6 +26,8 @@ on:
       - 'smoke.py'
       - 'cluster-checks.sh'
       - 'k8s-*.yaml'
+      # Правка самого workflow тоже должна прогоняться своим же PR.
+      - '.github/workflows/kai9000.yml'
 
 jobs:
   python:
