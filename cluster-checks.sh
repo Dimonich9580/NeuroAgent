@@ -42,6 +42,10 @@ want() { [ -z "$ONLY" ] || [ "$ONLY" = "$1" ]; }
 
 step1() {
     info "шаг 1: pydantic-settings в образе"
+    if ! command -v python >/dev/null 2>&1; then
+        warn "python не найден — шаг 1 пропущен (не кластер?)"
+        return 0
+    fi
     local out ver major
     if ! out="$(python -m pip show pydantic-settings 2>/dev/null)"; then
         fail "pydantic-settings не установлен — пересобери образ с >=2,<3"
@@ -66,6 +70,10 @@ step1() {
 
 step2() {
     info "шаг 2: KFP API ${KUBEFLOW_URL}/apis/v2beta1/runs"
+    if ! command -v curl >/dev/null 2>&1; then
+        warn "curl не найден — шаг 2 пропущен"
+        return 0
+    fi
     local code
     local args=(-s -o /dev/null -w '%{http_code}' --max-time 10
                 "${KUBEFLOW_URL}/apis/v2beta1/runs")
@@ -212,6 +220,13 @@ rc=0
 if [ -n "$ONLY" ]; then
     run_step "$ONLY" || rc=$?
     exit "$rc"
+fi
+
+if ! command -v kubectl >/dev/null 2>&1; then
+    warn "kubectl не найден — ./cluster-checks.sh не для локальной машины"
+    warn "для локальной проверки: py -m py_compile ... && py smoke.py"
+    warn "для кластера: скопировать на Linux-хост с kubectl или запустить scripts/deploy.sh"
+    exit 0
 fi
 
 if ! step1; then
