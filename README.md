@@ -68,3 +68,16 @@ CI (`.github/workflows/reproducible.yml`) собирает APK дважды в �
 ## Безопасность
 
 Агент может выполнять shell-команды и действия от имени пользователя. Ключи API хранятся в EncryptedSharedPreferences (AES256-GCM, Android Keystore). Сетевой трафик идёт только на endpoint, который указал пользователь.
+
+## KAI9000 — MLOps-оркестратор
+
+Рядом с Android-приложением в репозитории лежит `kai9000/` — детерминированный
+MLOps-оркестратор (retrain / rollback / scale / canary) с кластерным воркером и
+пультом для Termux/APK. Это отдельная подсистема, не связанная с кодом приложения.
+
+- Документация и переменные окружения: [`kai9000/README.md`](kai9000/README.md)
+- Локальная проверка без кластера: `python smoke.py` → `SMOKE OK`
+- Деплой на кластер: `scripts/deploy.sh` (Linux-хост с docker + kubectl)
+- Прогон на устройстве: `scripts/termux-smoke.sh` (внутри Termux)
+- CI: `.github/workflows/kai9000.yml` — py_compile, smoke, `bash -n`, yaml, docker build
+- PR: [#3 `kai9000` → `main`](https://github.com/Dimonich9580/NeuroAgent/pull/3) (draft до прогона на кластере)

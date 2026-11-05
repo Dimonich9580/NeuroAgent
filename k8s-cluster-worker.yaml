@@ -1,0 +1,145 @@
+# k8s-cluster-worker.yaml — исполнитель KAI9000 в кластере.
+# Применение: kubectl apply -f k8s-cluster-worker.yaml
+#
+# Секреты создаются отдельно (не в git):
+#   kubectl -n ml-system create secret generic kai9000-worker \
+#     --from-literal=KAI9000_REDIS_URL='redis://redis:6379/0' \
+#     --from-literal=KUBEFLOW_TOKEN='<sa-jwt-или-oidc-токен>'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ml-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kai9000-worker
+  namespace: ml-system
+---
+# scale: только scale-субресурс, не весь Deployment — минимум прав.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kai9000-worker
+  namespace: ml-system
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list"]
+  - apiGroups: ["serving.kserve.io"]
+    resources: ["inferenceservices"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "patch"]   # ветка B2 из cluster-checks.sh
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kai9000-worker
+  namespace: ml-system
+subjects:
+  - kind: ServiceAccount
+    name: kai9000-worker
+    namespace: ml-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kai9000-worker
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kai9000-worker
+  namespace: ml-system
+  labels:
+    app: kai9000-worker
+spec:
+  # replicas=1: один исполнитель. Для N — consumer group даёт
+  # уникальные KAI9000_CONSUMER из имени пода (fieldRef ниже).
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kai9000-worker
+  template:
+    metadata:
+      labels:
+        app: kai9000-worker
+    spec:
+      serviceAccountName: kai9000-worker
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: worker
+          image: ghcr.io/dimonich9580/kai9000-worker:1.0.0
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "cluster.worker_entry"]
+          env:
+            - name: KAI9000_REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: kai9000-worker
+                  key: KAI9000_REDIS_URL
+            - name: KUBEFLOW_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: kai9000-worker
+                  key: KUBEFLOW_TOKEN
+                  optional: true
+            # XREADGROUP consumer: имя пода уникально в consumer group
+            - name: KAI9000_CONSUMER
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: KUBEFLOW_URL
+              value: "http://ml-pipeline.ml-pipeline.svc.cluster.local:8888"
+            - name: KUBE_API_URL
+              value: "https://kubernetes.default.svc"
+            - name: KSERVE_NAMESPACE
+              value: "ml-system"
+            - name: KSERVE_ISVC
+              value: "prod-model"
+            - name: SCALE_TARGET_KIND
+              value: "Deployment"
+            - name: SCALE_TARGET_NAME
+              value: "prod-model"
+            - name: KAI9000_CLUSTER_ALERT_WEBHOOK
+              valueFrom:
+                secretKeyRef:
+                  name: kai9000-worker
+                  key: KAI9000_CLUSTER_ALERT_WEBHOOK
+                  optional: true
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            exec:
+              command: ["python", "-c", "import cluster.handler"]
+            initialDelaySeconds: 20
+            periodSeconds: 60
+          readinessProbe:
+            exec:
+              command: ["python", "-c", "import cluster.worker_entry"]
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      terminationGracePeriodSeconds: 30

@@ -1,0 +1,141 @@
+name: kai9000
+
+on:
+  push:
+    branches: [kai9000]
+    paths:
+      - 'kai9000/**'
+      - 'cluster/**'
+      - 'apk/**'
+      - 'termux/**'
+      - 'scripts/**'
+      - 'smoke.py'
+      - 'cluster-checks.sh'
+      - 'k8s-*.yaml'
+      - '.github/workflows/kai9000.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'kai9000/**'
+      - 'cluster/**'
+      - 'apk/**'
+      - 'termux/**'
+      - 'scripts/**'
+      - 'smoke.py'
+      - 'cluster-checks.sh'
+      - 'k8s-*.yaml'
+
+jobs:
+  python:
+    name: py_compile + smoke
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: py_compile
+        run: |
+          python -m py_compile \
+            kai9000/config.py kai9000/core.py kai9000/queue.py \
+            kai9000/termux_entry.py kai9000/__init__.py \
+            cluster/handler.py cluster/worker_entry.py cluster/__init__.py \
+            smoke.py
+      - name: smoke
+        run: python smoke.py
+
+  shell-yaml:
+    name: bash -n + yaml
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: bash -n
+        run: |
+          bash -n cluster-checks.sh
+          bash -n scripts/deploy.sh
+          bash -n scripts/termux-smoke.sh
+          bash -n termux/install.sh
+          bash -n termux/tunnel.sh
+      - name: yaml
+        run: |
+          python - <<'PY'
+          import yaml, pathlib
+          for p in ("k8s-cluster-worker.yaml", "k8s-networkpolicy.yaml"):
+              docs = list(yaml.safe_load_all(pathlib.Path(p).read_text(encoding="utf-8")))
+              print(f"{p}: {len(docs)} docs")
+          policy = list(yaml.safe_load_all(
+              pathlib.Path("k8s-networkpolicy.yaml").read_text(encoding="utf-8")))[0]
+          cidr = policy["spec"]["egress"][-1]["to"][0]["ipBlock"]["cidr"]
+          assert cidr == "__KUBE_API_CIDR__/32", f"placeholder lost: {cidr}"
+          print("placeholder ok:", cidr)
+          PY
+
+  docker-build:
+    name: docker build (no push)
+    runs-on: ubuntu-24.04
+    needs: python
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build worker image
+        run: |
+          docker build -f cluster/Dockerfile.worker \
+            -t kai9000-worker:ci .
+      - name: Verify pydantic-settings inside image
+        run: |
+          ver=$(docker run --rm --entrypoint python kai9000-worker:ci \
+            -m pip show pydantic-settings 2>/dev/null \
+            | awk -F': ' '/^Version:/{print $2; exit}')
+          echo "pydantic-settings in image: $ver"
+          test -n "$ver"
+          test "${ver%%.*}" = "2"
+      # Скан — отчёт, не гейт: падение trivy не должно ронять сборку образа.
+      - name: Trivy scan (HIGH/CRITICAL, report only)
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: kai9000-worker:ci
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+
+  cluster-checks-kind:
+    name: cluster-checks on kind
+    runs-on: ubuntu-24.04
+    needs: docker-build
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build worker image
+        run: |
+          docker build -f cluster/Dockerfile.worker \
+            -t kai9000-worker:ci .
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: kai9000-test
+      - name: Load image into kind
+        run: kind load docker-image kai9000-worker:ci --name kai9000-test
+      - name: Apply manifest (local image tag)
+        run: |
+          # Заменяем ghcr.io тег на локальный для kind
+          sed 's|ghcr.io/dimonich9580/kai9000-worker:1.0.0|kai9000-worker:ci|' \
+            k8s-cluster-worker.yaml | kubectl apply -f -
+          # Создаём dummy secret чтобы Deployment не падал на missing secret
+          kubectl -n ml-system create secret generic kai9000-worker \
+            --from-literal=KAI9000_REDIS_URL='redis://localhost:6379/0' \
+            --from-literal=KUBEFLOW_TOKEN='dummy' \
+            --dry-run=client -o yaml | kubectl apply -f -
+      - name: Wait for deployment (best-effort)
+        run: |
+          # Worker не пройдёт readiness probe без реального Redis — это ожидаемо.
+          # HPA check (step 3) не требует ready pods, только наличие Deployment.
+          kubectl -n ml-system rollout status deploy/kai9000-worker --timeout=30s || {
+            echo "[WARN] rollout не завершён (ожидается без Redis) — продолжаем"
+            kubectl -n ml-system get pods -l app=kai9000-worker -o wide || true
+          }
+      - name: Run cluster-checks step 3 (HPA check)
+        run: |
+          chmod +x cluster-checks.sh
+          NS=ml-system DEPLOY=kai9000-worker ./cluster-checks.sh --only 3
