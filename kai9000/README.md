@@ -133,3 +133,35 @@ KFP API 200, шаг 3 — HPA против воркера (ветки A/B/C), ш
 `_LockedState` использует `fcntl.flock` на POSIX (Termux, кластер) и
 `msvcrt.locking` на Windows — только чтобы смоук и юнит-прогон шли на
 dev-машине. Поведение на целевых платформах не меняется.
+
+## Точки отката
+
+| Что | SHA | Смысл |
+|---|---|---|
+| `main` | `e45d2e5` | merge PR #3 + CI на main + синхронизация README |
+| merge-коммит | `756f90d` | Merge pull request #3 |
+| ветка `kai9000` | `016c1a0` | последняя точка до merge, пошаговая история (gating → kind) |
+
+Ветку `kai9000` **не удалять** до зелёного `scripts/deploy.sh` на реальном
+кластере. Тело merge-коммита не содержит пошаговой истории, поэтому ветка —
+единственная точка отката без `git reflog`. Удалять после успешного прогона:
+
+```bash
+git push origin --delete kai9000
+```
+
+## Статус проверки
+
+Проверено:
+
+- CI на `main` (run #13): `py_compile + smoke`, `bash -n + yaml`,
+  `docker build` + pydantic-settings 2.x в образе, `cluster-checks-kind`
+- kind: манифест применяется (5 документов), RBAC валиден,
+  шаг 3 — HPA нет (ветка A: `_k8s_scale` правит `Deployment.scale` напрямую)
+- Windows: `termux_entry.main()` на msvcrt-пути, `_LockedState` (lock + reject)
+
+Не проверено (нужна реальная среда):
+
+- `cluster-checks.sh` шаги 2 и 4 — KFP API, Redis PING, KServe CRD (KUBECONFIG)
+- push образа в ghcr — GHCR PAT
+- Termux: `scripts/termux-smoke.sh` — путь `fcntl`
