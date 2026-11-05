@@ -79,5 +79,8 @@ MLOps-оркестратор (retrain / rollback / scale / canary) с класт
 - Локальная проверка без кластера: `python smoke.py` → `SMOKE OK`
 - Деплой на кластер: `scripts/deploy.sh` (Linux-хост с docker + kubectl)
 - Прогон на устройстве: `scripts/termux-smoke.sh` (внутри Termux)
-- CI: `.github/workflows/kai9000.yml` — py_compile, smoke, `bash -n`, yaml, docker build
-- PR: [#3 `kai9000` → `main`](https://github.com/Dimonich9580/NeuroAgent/pull/3) (draft до прогона на кластере)
+- CI: `.github/workflows/kai9000.yml` — py_compile, smoke, `bash -n`, yaml,
+  docker build, cluster-checks на эфемерном kind-кластере
+- PR: [#3 `kai9000` → `main`](https://github.com/Dimonich9580/NeuroAgent/pull/3) — влит
+- Статус: проверено в CI и на kind; шаги `cluster-checks.sh` 2 и 4
+  (KFP, Redis, KServe) требуют реального кластера — см. `kai9000/README.md`
