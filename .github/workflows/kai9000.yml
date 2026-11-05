@@ -92,8 +92,10 @@ jobs:
           echo "pydantic-settings in image: $ver"
           test -n "$ver"
           test "${ver%%.*}" = "2"
+      # Скан — отчёт, не гейт: падение trivy не должно ронять сборку образа.
       - name: Trivy scan (HIGH/CRITICAL, report only)
-        uses: aquasecurity/trivy-action@0.28.0
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: kai9000-worker:ci
           severity: HIGH,CRITICAL
