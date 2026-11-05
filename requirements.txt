@@ -1,0 +1,7 @@
+# Пульт (Termux / APK) и воркер (кластер) используют один набор.
+# Версии зафиксированы диапазоном: pydantic-settings 2.x обязателен —
+# на 1.x KAI9000Config падает на SettingsConfigDict.
+httpx>=0.27,<0.29
+pydantic>=2.7,<3
+pydantic-settings>=2.2,<3
+redis>=5.0,<9

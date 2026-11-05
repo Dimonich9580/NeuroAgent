@@ -1,0 +1,33 @@
+# Dockerfile.worker — образ кластерного воркера KAI9000.
+# Сборка: docker build -f cluster/Dockerfile.worker -t ghcr.io/dimonich9580/kai9000-worker:1.0.0 .
+# Запуск: см. k8s-cluster-worker.yaml
+#
+# Намеренно slim и без curl: проверка K8s API из пода идёт через python stdlib
+# (см. cluster-checks.sh шаг 4). Это уменьшает поверхность атаки и размер образа.
+
+FROM python:3.12-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Зависимости воркера: redis (async), aiohttp (KFP/K8s HTTP), pydantic-settings (config)
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && \
+    rm -rf /root/.cache/pip
+
+# Код воркера и ядра KAI9000
+COPY cluster/handler.py /app/cluster/handler.py
+COPY cluster/worker_entry.py /app/cluster/worker_entry.py
+COPY kai9000/ /app/kai9000/
+
+# Non-root пользователь
+RUN useradd -u 1000 -m -s /bin/bash worker && \
+    mkdir -p /home/worker/.kai9000 && \
+    chown -R worker:worker /app /home/worker/.kai9000
+
+USER worker
+
+# Воркер читает env из манифеста; дефолтный state_path writable для non-root
+CMD ["python", "-m", "cluster.worker_entry"]

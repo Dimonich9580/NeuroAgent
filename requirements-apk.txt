@@ -1,0 +1,3 @@
+# Зависимости Kivy-пульта (APK). Собирается buildozer на Linux-хосте.
+-r requirements.txt
+kivy>=2.3,<3

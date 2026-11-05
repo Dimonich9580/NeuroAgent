@@ -16,3 +16,25 @@ keystore.properties
 local.properties
 *.iml
 .externalNativeBuild/
+
+# --- KAI9000 (Python-оркестратор) ---
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# копии ядра, созданные apk/sync_core.py перед сборкой APK
+apk/kai9000/
+apk/cluster/
+
+# артефакты buildozer/p4a
+.buildozer/
+bin/
+*.spec.bak
+
+# состояние агента
+.kai9000/
+state.json
+state.lock
