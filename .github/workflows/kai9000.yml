@@ -100,3 +100,41 @@ jobs:
           image-ref: kai9000-worker:ci
           severity: HIGH,CRITICAL
           exit-code: '0'
+
+  cluster-checks-kind:
+    name: cluster-checks on kind
+    runs-on: ubuntu-24.04
+    needs: docker-build
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build worker image
+        run: |
+          docker build -f cluster/Dockerfile.worker \
+            -t kai9000-worker:ci .
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: kai9000-test
+      - name: Load image into kind
+        run: kind load docker-image kai9000-worker:ci --name kai9000-test
+      - name: Apply manifest (local image tag)
+        run: |
+          # Заменяем ghcr.io тег на локальный для kind
+          sed 's|ghcr.io/dimonich9580/kai9000-worker:1.0.0|kai9000-worker:ci|' \
+            k8s-cluster-worker.yaml | kubectl apply -f -
+          # Создаём dummy secret чтобы Deployment не падал на missing secret
+          kubectl -n ml-system create secret generic kai9000-worker \
+            --from-literal=KAI9000_REDIS_URL='redis://localhost:6379/0' \
+            --from-literal=KUBEFLOW_TOKEN='dummy' \
+            --dry-run=client -o yaml | kubectl apply -f -
+      - name: Wait for deployment
+        run: |
+          kubectl -n ml-system rollout status deploy/kai9000-worker --timeout=120s || {
+            kubectl -n ml-system get pods -l app=kai9000-worker -o wide || true
+            kubectl -n ml-system describe deploy kai9000-worker | tail -30 || true
+            exit 1
+          }
+      - name: Run cluster-checks step 3 (HPA check)
+        run: |
+          chmod +x cluster-checks.sh
+          NS=ml-system DEPLOY=kai9000-worker ./cluster-checks.sh --only 3
