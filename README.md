@@ -9,7 +9,7 @@
 
 ## Возможности
 
-- **AI-роутер:** OpenAI-совместимый API (OpenAI, OpenRouter, Ollama `/v1`, LM Studio, vLLM), 3 облачных слота и 1 локальный GGUF-слот (llama.cpp).
+- **AI-роутер:** OpenAI-совместимый API (OpenAI, OpenRouter, Ollama `/v1`, LM Studio, vLLM), 3 облачных слота 
 - **Стриминг** ответов (SSE) и **Tool Calling** (JSON Schema).
 - **Инструменты агента:**
   - `screen_reader`: дерево UI через AccessibilityService;
@@ -62,25 +62,24 @@ CI (`.github/workflows/reproducible.yml`) собирает APK дважды в �
 
 - AccessibilityService на некоторых прошивках отключается системой. Включить его можно в «Спец. возможностях».
 - Wi-Fi и Bluetooth на Android 10+ нельзя переключить обычным API приложения. Для этого нужен Shizuku (`svc wifi enable`).
-- Локальная модель (GGUF, Q4_K_M) ориентирована на устройства с 8 ГБ+ RAM. Скорость зависит от SoC.
 - Локальные модели не имеют нативного tool calling. Вызовы идут через теги `<tool_call>` в тексте (см. `LocalToolCallParser`).
 
 ## Безопасность
 
 Агент может выполнять shell-команды и действия от имени пользователя. Ключи API хранятся в EncryptedSharedPreferences (AES256-GCM, Android Keystore). Сетевой трафик идёт только на endpoint, который указал пользователь.
 
-## KAI9000 — MLOps-оркестратор
+## Dimonich — MLOps-оркестратор
 
-Рядом с Android-приложением в репозитории лежит `kai9000/` — детерминированный
+Рядом с Android-приложением в репозитории лежит `dimonich/` — детерминированный
 MLOps-оркестратор (retrain / rollback / scale / canary) с кластерным воркером и
 пультом для Termux/APK. Это отдельная подсистема, не связанная с кодом приложения.
 
-- Документация и переменные окружения: [`kai9000/README.md`](kai9000/README.md)
+- Документация и переменные окружения: [`Dimonich/README.md`](kai9000/README.md)
 - Локальная проверка без кластера: `python smoke.py` → `SMOKE OK`
 - Деплой на кластер: `scripts/deploy.sh` (Linux-хост с docker + kubectl)
 - Прогон на устройстве: `scripts/termux-smoke.sh` (внутри Termux)
-- CI: `.github/workflows/kai9000.yml` — py_compile, smoke, `bash -n`, yaml,
+- CI: `.github/workflows/dimonich.yml` — py_compile, smoke, `bash -n`, yaml,
   docker build, cluster-checks на эфемерном kind-кластере
-- PR: [#3 `kai9000` → `main`](https://github.com/Dimonich9580/NeuroAgent/pull/3) — влит
+- PR: [#3 `dimonich` → `main`](https://github.com/Dimonich9580/NeuroAgent/pull/3) — влит
 - Статус: проверено в CI и на kind; шаги `cluster-checks.sh` 2 и 4
   (KFP, Redis, KServe) требуют реального кластера — см. `kai9000/README.md`
