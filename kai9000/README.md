@@ -1,4 +1,4 @@
-# KAI9000 — детерминированный MLOps-оркестратор
+# Dimonich — детерминированный MLOps-оркестратор
 
 Источник истины: [`../Dimonich.md`](../Dimonich.md). Код в этом каталоге
 вырезан из спеки скриптом `scripts/extract_dimonich_md.py` — правь спеку,
@@ -21,10 +21,10 @@ Kai9000Agent.run_cycle()  ──►  kai9000:actions  ──►  StreamActionQue
 
 | Файл | Роль |
 |---|---|
-| `kai9000/config.py` | `KAI9000Config` (pydantic-settings 2.x, префикс `KAI9000_`) |
-| `kai9000/core.py` | `Kai9000Agent`: метрики → `_decide` → `_execute` → очередь |
-| `kai9000/queue.py` | `StreamActionQueue`: XADD/XREADGROUP, pending TTL, retries |
-| `kai9000/termux_entry.py` | вход пульта: `FileMetricsSource`/`HttpMetricsSource`, алерты |
+| `dimonich/config.py` | `KAI9000Config` (pydantic-settings 2.x, префикс `KAI9000_`) |
+| `dimonich/core.py` | `Kai9000Agent`: метрики → `_decide` → `_execute` → очередь |
+| `dimonich/queue.py` | `StreamActionQueue`: XADD/XREADGROUP, pending TTL, retries |
+| `dimonich/termux_entry.py` | вход пульта: `FileMetricsSource`/`HttpMetricsSource`, алерты |
 | `cluster/handler.py` | `make_handler`: KFP retrain, KServe rollback, K8s scale |
 | `cluster/worker_entry.py` | вход исполнителя: очередь + handler + graceful stop |
 | `smoke.py` | смоук-прогон без Redis и кластера (фейки) |
@@ -60,7 +60,7 @@ kubectl apply -f k8s-cluster-worker.yaml
 ### APK
 
 ```bash
-python apk/sync_core.py                          # копии kai9000/ и cluster/ в apk/
+python apk/sync_core.py                          # копии dimonich/ и cluster/ в apk/
 cd apk && buildozer android debug
 ```
 
@@ -70,7 +70,7 @@ cd apk && buildozer android debug
 
 ```bash
 docker build -f cluster/Dockerfile.worker \
-    -t ghcr.io/dimonich9580/kai9000-worker:1.0.0 .
+    -t ghcr.io/dimonich9580/dimonich-worker:1.0.0 .
 ```
 
 Образ slim, non-root, без curl. Проверка K8s API из пода идёт через python stdlib.
@@ -79,7 +79,7 @@ docker build -f cluster/Dockerfile.worker \
 
 Их два набора, и это не опечатка — так в спеке:
 
-**1. Поля `KAI9000Config`** — префикс `Dimonich_`, регистр не важен,
+**1. Поля `dimonichConfig`** — префикс `Dimonich_`, регистр не важен,
 незнакомые ключи игнорируются (`extra="ignore"`).
 
 | Переменная | Дефолт |
@@ -104,9 +104,9 @@ docker build -f cluster/Dockerfile.worker \
 
 | Переменная | Где читается |
 |---|---|
-| `KAI9000_REDIS_URL` | `termux_entry.py`, `worker_entry.py` |
-| `KAI9000_CONSUMER` | `worker_entry.py` (в k8s — имя пода) |
-| `KAI9000_CLUSTER_ALERT_WEBHOOK` | `worker_entry.py` |
+| `dimonich_REDIS_URL` | `termux_entry.py`, `worker_entry.py` |
+| `dimonich_CONSUMER` | `worker_entry.py` (в k8s — имя пода) |
+| `dimonich_CLUSTER_ALERT_WEBHOOK` | `worker_entry.py` |
 | `KUBEFLOW_URL`, `KUBEFLOW_TOKEN` | `worker_entry.py` → KFP retrain |
 | `KUBE_API_URL` | `worker_entry.py` → `_k8s_scale` |
 | `KSERVE_NAMESPACE`, `KSERVE_ISVC` | `worker_entry.py` → rollback |
@@ -114,7 +114,7 @@ docker build -f cluster/Dockerfile.worker \
 
 Расхождение в самой спеке: docstring `config.py` называет `Dimonich_REDIS_URL`
 и `Dimonich_CONSUMER` «обычными env-переменными», а код читает
-`KAI9000_REDIS_URL` и `KAI9000_CONSUMER`. Работает код — он и задокументирован.
+`dimonich_REDIS_URL` и `dimonich_CONSUMER`. Работает код — он и задокументирован.
 
 ## Проверки
 
@@ -139,12 +139,12 @@ dev-машине. Поведение на целевых платформах н
 | Что | SHA | Смысл |
 |---|---|---|
 | merge-коммит | `756f90d` | Merge pull request #3 |
-| ветка `kai9000` | `016c1a0` | последняя точка до merge, пошаговая история (gating → kind) |
+| ветка `dimonich` | `016c1a0` | последняя точка до merge, пошаговая история (gating → kind) |
 
 Текущий `main` — `git log -1 --oneline origin/main` (двигается с каждым
 документным коммитом, фиксировать его здесь смысла нет).
 
-Ветку `kai9000` **не удалять** до зелёного `scripts/deploy.sh` на реальном
+Ветку `dimonich` **не удалять** до зелёного `scripts/deploy.sh` на реальном
 кластере. Тело merge-коммита не содержит пошаговой истории, поэтому ветка —
 единственная точка отката без `git reflog`. Удалять после успешного прогона:
 
